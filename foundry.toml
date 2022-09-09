@@ -1,6 +1,48 @@
+# =================================
+# ======== Default Profile ========
+# =================================
 [profile.default]
-src = 'src'
-out = 'out'
-libs = ['lib']
+verbosity = 3
+solc_version = "0.8.16"
+optimizer = true
+optimizer_runs = 10_000_000
+remappings = [
+  # Allows imports using e.g. `test/` to refer to root `test` directory.
+  "test/=test/",
+  "script/=script/",
+]
 
-# See more config options https://github.com/foundry-rs/foundry/tree/master/config
+# ==============================
+# ======== Lite Profile ========
+# ==============================
+# Speed up compilation and tests during development.
+
+[profile.lite]
+optimizer = false
+
+[profile.lite.fuzz]
+runs = 50
+
+[profile.lite.invariant]
+runs = 10
+
+# ============================
+# ======== CI Profile ========
+# ============================
+[profile.ci.fuzz]
+runs = 5000
+
+[profile.ci.invariant]
+runs = 1000
+
+# ============================
+# ======== Formatting ========
+# ============================
+[profile.default.fmt]
+line_length = 80
+tab_width = 2
+bracket_spacing = false
+int_types = 'short'
+func_attrs_with_params_multiline = true
+quote_style = 'double'
+number_underscore = 'thousands'
