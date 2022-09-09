@@ -46,3 +46,10 @@ int_types = 'short'
 func_attrs_with_params_multiline = false
 quote_style = 'double'
 number_underscore = 'thousands'
+
+# ===============================
+# ======== RPC Endpoints ========
+# ===============================
+[rpc_endpoints]
+optimism = "${OPTIMISM_RPC_URL}"
+arbitrum = "${ARBITRUM_RPC_URL}"
