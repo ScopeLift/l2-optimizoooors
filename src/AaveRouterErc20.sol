@@ -54,23 +54,35 @@ interface IERC20 {
 contract AaveRouterErc20Factory {
   IAavePool public immutable aave;
 
-  event RouterDeployed(address router, address indexed asset);
+  event RoutersDeployed(
+    address supplyRouter, address withdrawRouter, address indexed asset
+  );
 
   constructor(IAavePool _aave) {
     aave = _aave;
   }
 
-  function deployRouter(address asset) external returns (AaveRouterErc20) {
-    AaveRouterErc20 router = new AaveRouterErc20{salt: salt(asset)}(aave, asset);
-    emit RouterDeployed(address(router), asset);
-    return router;
+  function deployRouters(address asset)
+    external
+    returns (
+      AaveSupplyRouterErc20 supplyRouter,
+      AaveWithdrawRouterErc20 withdrawRouter
+    )
+  {
+    supplyRouter = new AaveSupplyRouterErc20{salt: salt(asset)}(aave, asset);
+    withdrawRouter = new AaveWithdrawRouterErc20{salt: salt(asset)}(aave, asset);
+    emit RoutersDeployed(address(supplyRouter), address(withdrawRouter), asset);
   }
 
   function isDeployed(address asset) public view returns (bool) {
-    return computeAddress(asset).code.length > 0;
+    return computeSupplyRouterAddress(asset).code.length > 0;
   }
 
-  function computeAddress(address asset) public view returns (address) {
+  function computeSupplyRouterAddress(address asset)
+    public
+    view
+    returns (address)
+  {
     // https://eips.ethereum.org/EIPS/eip-1014
     bytes32 data = keccak256(
       abi.encodePacked(
@@ -78,7 +90,30 @@ contract AaveRouterErc20Factory {
         address(this),
         salt(asset),
         keccak256(
-          abi.encodePacked(type(AaveRouterErc20).creationCode, abi.encode(aave, asset))
+          abi.encodePacked(
+            type(AaveSupplyRouterErc20).creationCode, abi.encode(aave, asset)
+          )
+        )
+      )
+    );
+    return address(uint160(uint(data)));
+  }
+
+  function computeWithdrawRouterAddress(address asset)
+    public
+    view
+    returns (address)
+  {
+    // https://eips.ethereum.org/EIPS/eip-1014
+    bytes32 data = keccak256(
+      abi.encodePacked(
+        bytes1(0xff),
+        address(this),
+        salt(asset),
+        keccak256(
+          abi.encodePacked(
+            type(AaveWithdrawRouterErc20).creationCode, abi.encode(aave, asset)
+          )
         )
       )
     );
@@ -90,7 +125,7 @@ contract AaveRouterErc20Factory {
   }
 }
 
-contract AaveRouterErc20 {
+abstract contract AaveRouterBase {
   IAavePool public immutable aave;
   address public immutable asset;
 
@@ -99,30 +134,43 @@ contract AaveRouterErc20 {
     asset = _asset;
   }
 
+  // The amount supplied is a fraction of the user's balance. You can pass up
+  // to 31 bytes of data to define this fraction. If 1 byte is provided, that
+  // data is considered the numerator, and the denominator becomes 255, which
+  // is the max value of a single byte. If 2 bytes are provided, the data is
+  // still considered the numerator, but the denominator becomes 65_535, which
+  // is the max value of 2 bytes. This will revert if you try passing 32 bytes
+  // or more of calldata, but realistically you'll never need that much anyway.
   function parseAmount(uint balance, bytes calldata data)
     internal
     pure
     returns (uint)
   {
-    if (data.length == 0) {
-      return balance;
-    }
-
     uint bits = data.length * 8;
     uint fraction = uint(bytes32(data) >> (256 - bits));
     uint maxUintN = (1 << bits) - 1;
     return fraction * balance / maxUintN;
   }
+}
 
-  // The amount supplied is a fraction of the user's balance. You can pass up
-  // to 31 bytes of data to define this fraction. If 1 byte is provided, that
-  // data is considered the numerator, and the denominator becomes 255, which is
-  // the max value of a single byte. If 2 bytes are provided, the data is still
-  // considered the numerator, but the denominator becomes 65_535, which is the
-  // max value of 2 bytes.
+contract AaveSupplyRouterErc20 is AaveRouterBase {
+  constructor(IAavePool aave, address asset) AaveRouterBase(aave, asset) {}
+
   fallback() external {
     uint balance = IERC20(asset).balanceOf(msg.sender);
-    uint amount = parseAmount(balance, msg.data);
-    aave.supply(asset, amount, msg.sender, 0);
+    uint amt = msg.data.length == 0 ? balance : parseAmount(balance, msg.data);
+    // aave.supply(asset, amt, msg.sender, 0);
+  }
+}
+
+contract AaveWithdrawRouterErc20 is AaveRouterBase {
+  uint internal constant MAX_UINT = type(uint).max;
+
+  constructor(IAavePool aave, address asset) AaveRouterBase(aave, asset) {}
+
+  fallback() external {
+    uint balance = IERC20(asset).balanceOf(msg.sender);
+    uint amt = msg.data.length == 0 ? MAX_UINT : parseAmount(balance, msg.data);
+    // aave.withdraw(asset, amount, msg.sender, 0);
   }
 }
