@@ -44,6 +44,10 @@ interface IAavePool {
     address onBehalfOf,
     uint16 referralCode
   ) external;
+
+  function withdraw(address asset, uint amount, address to)
+    external
+    returns (uint);
 }
 
 // =========================
@@ -60,6 +64,10 @@ interface IAavePool {
 // method will revert if you try passing 32 bytes or more of calldata.
 // Realistically you'll never need that much anyway.
 function parseAmount(uint balance, bytes calldata data) pure returns (uint) {
+  if (data.length == 0) {
+    return balance;
+  }
+
   uint bits = data.length * 8;
   uint fraction = uint(bytes32(data) >> (256 - bits));
   uint maxUintN = (1 << bits) - 1;
@@ -73,6 +81,9 @@ function parseAmount(uint balance, bytes calldata data) pure returns (uint) {
 abstract contract AaveRouterBase {
   IAavePool public immutable AAVE;
   address public immutable ASSET;
+  address public immutable ATOKEN;
+
+  uint internal constant MAX_UINT = type(uint).max;
   uint16 internal constant REFERRAL_CODE = 0;
 
   mapping(address => address) public supplyRouter; // asset => router
@@ -81,11 +92,11 @@ abstract contract AaveRouterBase {
   constructor(IAavePool aave, address asset) {
     AAVE = aave;
     ASSET = asset;
+    ATOKEN = aave.getReserveData(asset).aTokenAddress;
   }
 }
 
 // -------- Supply ETH Router --------
-
 contract AaveSupplyEth is AaveRouterBase {
   using SafeTransferLib for IERC20;
 
@@ -95,18 +106,11 @@ contract AaveSupplyEth is AaveRouterBase {
 
   receive() external payable {
     IWETH(ASSET).deposit{value: msg.value}();
-    AAVE.supply(address(ASSET), msg.value, msg.sender, REFERRAL_CODE);
+    AAVE.supply(ASSET, msg.value, msg.sender, REFERRAL_CODE);
   }
 }
 
-// -------- Withdraw ETH Router --------
-
-contract AaveWithdrawEth is AaveRouterBase {
-  constructor(IAavePool aave, address asset) AaveRouterBase(aave, asset) {}
-}
-
-// -------- Supply Token Router --------
-
+// -------- Supply Tokens Router --------
 contract AaveSupplyToken is AaveRouterBase {
   using SafeTransferLib for IERC20;
 
@@ -116,16 +120,51 @@ contract AaveSupplyToken is AaveRouterBase {
 
   fallback() external {
     uint balance = IERC20(ASSET).balanceOf(msg.sender);
-    uint amt = msg.data.length == 0 ? balance : parseAmount(balance, msg.data);
+    uint amt = parseAmount(balance, msg.data);
     IERC20(ASSET).safeTransferFrom(msg.sender, address(this), amt);
     AAVE.supply(ASSET, amt, msg.sender, 0);
   }
 }
 
-// -------- Withdraw Token Router --------
+// -------- Withdraw ETH Router --------
+contract AaveWithdrawEth is AaveRouterBase {
+  using SafeTransferLib for IERC20;
 
-contract AaveWithdrawToken is AaveRouterBase {
   constructor(IAavePool aave, address asset) AaveRouterBase(aave, asset) {}
+
+  fallback() external payable {
+    if (msg.sender == ASSET) {
+      return; // Getting ETH from the WETH contract.
+    }
+
+    uint balance = IERC20(ATOKEN).balanceOf(msg.sender);
+    uint amt = parseAmount(balance, msg.data);
+    IERC20(ATOKEN).safeTransferFrom(msg.sender, address(this), amt);
+
+    // Need to pass MAX_UINT to withdraw full amount after interest accrual.
+    amt = AAVE.withdraw(ASSET, amt == balance ? MAX_UINT : amt, address(this));
+
+    // Unwrap WETH and send ETH to user.
+    IWETH(ASSET).withdraw(amt);
+    (bool ok,) = msg.sender.call{value: amt}("");
+    require(ok, "Transfer failed");
+  }
+}
+
+// -------- Withdraw Tokens Router --------
+contract AaveWithdrawToken is AaveRouterBase {
+  using SafeTransferLib for IERC20;
+
+  constructor(IAavePool aave, address asset) AaveRouterBase(aave, asset) {}
+
+  fallback() external {
+    uint balance = IERC20(ATOKEN).balanceOf(msg.sender);
+    uint amt = parseAmount(balance, msg.data);
+    IERC20(ATOKEN).safeTransferFrom(msg.sender, address(this), amt);
+
+    // Need to pass MAX_UINT to withdraw full amount after interest accrual.
+    AAVE.withdraw(address(ASSET), amt == balance ? MAX_UINT : amt, msg.sender);
+  }
 }
 
 // =========================
@@ -148,7 +187,7 @@ contract AaveRouterFactory {
 
     bytes32 salt = _salt(weth);
     SUPPLY_ETH_ROUTER = address(new AaveSupplyEth{salt: salt}(aave, weth));
-    WITHDRAW_ETH_ROUTER = address(0);
+    WITHDRAW_ETH_ROUTER = address(new AaveWithdrawEth{salt: salt}(aave, weth));
     emit RoutersDeployed(SUPPLY_ETH_ROUTER, WITHDRAW_ETH_ROUTER, weth);
   }
 

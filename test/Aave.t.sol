@@ -18,6 +18,8 @@ contract ParseAmount is Test {
   }
 
   function test_ParseAmount() public {
+    this.assertParseAmount(bytes.concat(""), balance);
+
     this.assertParseAmount(bytes.concat(hex"ff"), balance);
     this.assertParseAmount(bytes.concat(hex"ffff"), balance);
     this.assertParseAmount(bytes.concat(hex"ffffffff"), balance);
@@ -79,15 +81,36 @@ contract AaveFactoryBaseTest is Test {
   address weth = makeAddr("weth");
 
   function setUp() public {
-    vm.mockCall(
-      weth, abi.encodeWithSelector(IERC20.approve.selector), abi.encode(true)
-    );
+    mockTokenResponses(weth);
     factory = new AaveRouterFactory(IAavePool(aave), weth);
   }
 
-  function mockApproveReturn(address asset) internal {
+  function mockTokenResponses(address asset) internal {
     vm.mockCall(
       asset, abi.encodeWithSelector(IERC20.approve.selector), abi.encode(true)
+    );
+    vm.mockCall(
+      aave,
+      abi.encodeCall(IAavePool.getReserveData, (asset)),
+      abi.encode(
+        IAavePool.ReserveData(
+          IAavePool.ReserveConfigurationMap(0),
+          uint128(0),
+          uint128(0),
+          uint128(0),
+          uint128(0),
+          uint128(0),
+          uint40(0),
+          uint16(0),
+          address(uint160(asset) + 1), // Arbitrary aToken address
+          address(0),
+          address(0),
+          address(0),
+          uint128(0),
+          uint128(0),
+          uint128(0)
+        )
+      )
     );
   }
 }
@@ -124,7 +147,8 @@ contract AaveFactoryConstructor is AaveFactoryBaseTest {
 
 contract AaveFactoryDeploy is AaveFactoryBaseTest {
   function test_DeployRouter(address asset) public {
-    mockApproveReturn(asset);
+    vm.assume(asset != address(vm));
+    mockTokenResponses(asset);
 
     (address supplyRtr1, address withdrawRtr1) = factory.computeAddresses(asset);
     (address supplyRtr2, address withdrawRtr2) = factory.deploy(asset);
@@ -136,7 +160,7 @@ contract AaveFactoryDeploy is AaveFactoryBaseTest {
   }
 
   function test_RevertsIfAssetAlreadyDeployed(address asset) public {
-    mockApproveReturn(asset);
+    mockTokenResponses(asset);
 
     factory.deploy(asset);
     vm.expectRevert(stdError.lowLevelError);
@@ -146,7 +170,7 @@ contract AaveFactoryDeploy is AaveFactoryBaseTest {
 
 contract AaveFactoryIsDeployed is AaveFactoryBaseTest {
   function test_IsDeployed(address asset) public {
-    mockApproveReturn(asset);
+    mockTokenResponses(asset);
 
     (address supplyRtr, address withdrawRtr) = factory.isDeployed(asset);
     assertEq(supplyRtr, address(0), "supply1");
@@ -167,8 +191,8 @@ contract AaveFactoryComputeAddress is AaveFactoryBaseTest {
   }
 
   function test_ComputeAddressToken(address asset) public {
-    vm.assume(asset != weth);
-    mockApproveReturn(asset);
+    vm.assume(asset != weth && asset != address(vm));
+    mockTokenResponses(asset);
 
     (address supplyRtr1, address withdrawRtr1) = factory.computeAddresses(asset);
     (address supplyRtr2, address withdrawRtr2) = factory.deploy(asset);
@@ -213,7 +237,7 @@ contract RouterForkTestBase is Test {
 }
 
 contract SupplyEthFork is RouterForkTestBase {
-  function test_SupplyEth() public {
+  function test_SupplyEthPartial() public {
     address supplyEthRtr = factory.SUPPLY_ETH_ROUTER();
 
     (bool ok,) = payable(supplyEthRtr).call{value: 25 ether}("");
@@ -222,23 +246,98 @@ contract SupplyEthFork is RouterForkTestBase {
     assertEq(address(this).balance, 75 ether, "balance");
     assertEq(atoken(weth).balanceOf(address(this)), 25 ether, "atoken");
   }
+
+  function test_SupplyEthFull() public {
+    address supplyEthRtr = factory.SUPPLY_ETH_ROUTER();
+
+    (bool ok,) = payable(supplyEthRtr).call{value: 100 ether}("");
+    assertTrue(ok, "supply failed");
+
+    assertEq(address(this).balance, 0 ether, "balance");
+    assertEq(atoken(weth).balanceOf(address(this)), 100 ether, "atoken");
+  }
 }
 
 contract SupplyTokenFork is RouterForkTestBase {
-  function test_SupplyToken() public {
+  function test_SupplyTokenPartial() public {
     (address supplyTokenRtr,) = factory.computeAddresses(usdc);
+    IERC20(usdc).approve(supplyTokenRtr, type(uint).max);
 
     // We want to supply 25% of our balance, which is close to 64/255, and 64
     // is 0x40 in hex.
-    uint depositAmt = 100_000e6 * 64 / uint(255);
-
-    IERC20(usdc).approve(supplyTokenRtr, type(uint).max);
     (bool ok,) = supplyTokenRtr.call(hex"40");
     assertTrue(ok, "supply failed");
 
-    assertEq(
-      IERC20(usdc).balanceOf(address(this)), 100_000e6 - depositAmt, "balance"
-    );
+    uint depositAmt = 100_000e6 * 64 / uint(255);
+    uint expectedBal = 100_000e6 - depositAmt;
+    assertEq(IERC20(usdc).balanceOf(address(this)), expectedBal, "balance");
     assertEq(atoken(usdc).balanceOf(address(this)), depositAmt, "atoken");
+  }
+
+  function test_SupplyTokenFull() public {
+    (address supplyTokenRtr,) = factory.computeAddresses(usdc);
+    IERC20(usdc).approve(supplyTokenRtr, type(uint).max);
+
+    (bool ok,) = supplyTokenRtr.call("");
+    assertTrue(ok, "supply failed");
+
+    assertEq(IERC20(usdc).balanceOf(address(this)), 0, "balance");
+    assertEq(atoken(usdc).balanceOf(address(this)), 100_000e6, "atoken");
+  }
+}
+
+contract WithdrawEthFork is SupplyEthFork {
+  function test_WithdrawEthFull() public {
+    test_SupplyEthFull(); // Run this test to get us ATokens.
+    address withdrawEthRtr = factory.WITHDRAW_ETH_ROUTER();
+    atoken(weth).approve(withdrawEthRtr, type(uint).max);
+
+    (bool ok,) = withdrawEthRtr.call("");
+    assertTrue(ok, "withdraw failed");
+
+    assertEq(address(this).balance, 100 ether, "balance");
+    assertEq(atoken(weth).balanceOf(address(this)), 0, "atoken");
+  }
+
+  function test_WithdrawEthPartial() public {
+    test_SupplyEthFull(); // Run this test to get us ATokens.
+    address withdrawEthRtr = factory.WITHDRAW_ETH_ROUTER();
+    atoken(weth).approve(withdrawEthRtr, type(uint).max);
+
+    (bool ok,) = withdrawEthRtr.call(hex"40"); // About 25% of our balance.
+    assertTrue(ok, "withdraw failed");
+
+    uint withdrawAmt = 100 ether * 64 / uint(255);
+    uint expectedBal = 100 ether - withdrawAmt;
+    assertEq(address(this).balance, withdrawAmt, "balance");
+    assertEq(atoken(weth).balanceOf(address(this)), expectedBal, "atoken");
+  }
+}
+
+contract WithdrawTokenFork is SupplyTokenFork {
+  function test_WithdrawTokenFull() public {
+    test_SupplyTokenFull(); // Run this test to get us ATokens.
+    (, address withdrawTokenRtr) = factory.computeAddresses(usdc);
+    atoken(usdc).approve(withdrawTokenRtr, type(uint).max);
+
+    (bool ok,) = withdrawTokenRtr.call("");
+    assertTrue(ok, "withdraw failed");
+
+    assertEq(address(this).balance, 100 ether, "balance");
+    assertEq(atoken(weth).balanceOf(address(this)), 0, "atoken");
+  }
+
+  function test_WithdrawTokenPartial() public {
+    test_SupplyTokenFull(); // Run this test to get us ATokens.
+    (, address withdrawTokenRtr) = factory.computeAddresses(usdc);
+    atoken(usdc).approve(withdrawTokenRtr, type(uint).max);
+
+    (bool ok,) = withdrawTokenRtr.call(hex"40"); // About 25% of our balance.
+    assertTrue(ok, "withdraw failed");
+
+    uint withdrawAmt = 100_000e6 * 64 / uint(255);
+    uint expectedBal = 100_000e6 - withdrawAmt;
+    assertEq(IERC20(usdc).balanceOf(address(this)), withdrawAmt, "balance");
+    assertEq(atoken(usdc).balanceOf(address(this)), expectedBal, "atoken");
   }
 }
