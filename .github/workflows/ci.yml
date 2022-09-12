@@ -9,6 +9,8 @@ on:
 
 env:
   FOUNDRY_PROFILE: ci
+  OPTIMISM_RPC_URL: ${{ secrets.OPTIMISM_RPC_URL }}
+  ARBITRUM_RPC_URL: ${{ secrets.ARBITRUM_RPC_URL }}
 
 jobs:
   run-ci:
