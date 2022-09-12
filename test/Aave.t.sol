@@ -102,7 +102,7 @@ contract AaveFactoryBaseTest is Test {
           uint128(0),
           uint40(0),
           uint16(0),
-          address(uint160(asset) + 1), // Arbitrary aToken address
+          address(uint160(bytes20(keccak256(abi.encodePacked(asset))))),
           address(0),
           address(0),
           address(0),
@@ -168,18 +168,26 @@ contract AaveFactoryDeploy is AaveFactoryBaseTest {
   }
 }
 
-contract AaveFactoryIsDeployed is AaveFactoryBaseTest {
-  function test_IsDeployed(address asset) public {
+contract AaveFactoryGetRouters is AaveFactoryBaseTest {
+  function test_GetRouters(address asset) public {
     mockTokenResponses(asset);
 
-    (address supplyRtr, address withdrawRtr) = factory.isDeployed(asset);
+    (address supplyRtr, address withdrawRtr) = factory.getRouters(asset);
     assertEq(supplyRtr, address(0), "supply1");
     assertEq(withdrawRtr, address(0), "withdraw1");
 
     factory.deploy(asset);
-    (supplyRtr, withdrawRtr) = factory.isDeployed(asset);
+    (supplyRtr, withdrawRtr) = factory.getRouters(asset);
     assertTrue(supplyRtr > address(0), "supply2");
     assertTrue(withdrawRtr > address(0), "withdraw2");
+  }
+
+  function test_IsDeployed(address asset) public {
+    mockTokenResponses(asset);
+
+    assertFalse(factory.isDeployed(asset), "deployed1");
+    factory.deploy(asset);
+    assertTrue(factory.isDeployed(asset), "deployed2");
   }
 }
 

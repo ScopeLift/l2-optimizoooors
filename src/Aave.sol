@@ -86,9 +86,6 @@ abstract contract AaveRouterBase {
   uint internal constant MAX_UINT = type(uint).max;
   uint16 internal constant REFERRAL_CODE = 0;
 
-  mapping(address => address) public supplyRouter; // asset => router
-  mapping(address => address) public withdrawRouter; // asset => router
-
   constructor(IAavePool aave, address asset) {
     AAVE = aave;
     ASSET = asset;
@@ -201,7 +198,7 @@ contract AaveRouterFactory {
     return (supplyRouter, withdrawRouter);
   }
 
-  function isDeployed(address asset) public view returns (address, address) {
+  function getRouters(address asset) public view returns (address, address) {
     if (asset == WETH) {
       return (SUPPLY_ETH_ROUTER, WITHDRAW_ETH_ROUTER);
     }
@@ -211,6 +208,11 @@ contract AaveRouterFactory {
       return (address(0), address(0));
     }
     return (supplyRouter, withdrawRouter);
+  }
+
+  function isDeployed(address asset) external view returns (bool) {
+    (address supplyRouter,) = getRouters(asset);
+    return supplyRouter != address(0);
   }
 
   function computeAddresses(address asset)
