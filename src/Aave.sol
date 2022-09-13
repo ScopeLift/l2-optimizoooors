@@ -48,6 +48,10 @@ interface IAavePool {
   function withdraw(address asset, uint amount, address to)
     external
     returns (uint);
+
+  // The below methods are used in scripts, but not in these contracts.
+  function supply(bytes32 args) external;
+  function withdraw(bytes32 args) external;
 }
 
 // =========================

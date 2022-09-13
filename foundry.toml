@@ -6,6 +6,7 @@ verbosity = 3
 solc_version = "0.8.16"
 optimizer = true
 optimizer_runs = 10_000_000
+fs_permissions = [{ access = "read", path = "./broadcast"}]
 remappings = [
   # Allows imports using e.g. `test/` to refer to root `test` directory.
   "test/=test/",
