@@ -6,6 +6,7 @@ verbosity = 3
 solc_version = "0.8.16"
 optimizer = true
 optimizer_runs = 10_000_000
+fs_permissions = [{ access = "read", path = "./broadcast"}]
 remappings = [
   # Allows imports using e.g. `test/` to refer to root `test` directory.
   "test/=test/",
@@ -43,6 +44,13 @@ line_length = 80
 tab_width = 2
 bracket_spacing = false
 int_types = 'short'
-func_attrs_with_params_multiline = true
+func_attrs_with_params_multiline = false
 quote_style = 'double'
 number_underscore = 'thousands'
+
+# ===============================
+# ======== RPC Endpoints ========
+# ===============================
+[rpc_endpoints]
+optimism = "${OPTIMISM_RPC_URL}"
+arbitrum = "${ARBITRUM_RPC_URL}"
