@@ -53,4 +53,4 @@ number_underscore = 'thousands'
 # ===============================
 [rpc_endpoints]
 optimism = "${OPTIMISM_RPC_URL}"
-arbitrum = "${ARBITRUM_RPC_URL}"
+optimism_goerli = "${OPTIMISM_GOERLI_RPC_URL}"
