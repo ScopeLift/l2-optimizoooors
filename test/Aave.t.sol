@@ -160,6 +160,7 @@ contract AaveFactoryDeploy is AaveFactoryBaseTest {
   }
 
   function test_RevertsIfAssetAlreadyDeployed(address asset) public {
+    vm.assume(asset != address(vm));
     mockTokenResponses(asset);
 
     factory.deploy(asset);
