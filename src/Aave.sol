@@ -68,9 +68,7 @@ interface IAavePool {
 // method will revert if you try passing 32 bytes or more of calldata.
 // Realistically you'll never need that much anyway.
 function parseAmount(uint balance, bytes calldata data) pure returns (uint) {
-  if (data.length == 0) {
-    return balance;
-  }
+  if (data.length == 0) return balance;
 
   uint bits = data.length * 8;
   uint fraction = uint(bytes32(data) >> (256 - bits));
@@ -134,9 +132,7 @@ contract AaveWithdrawEth is AaveRouterBase {
   constructor(IAavePool aave, address asset) AaveRouterBase(aave, asset) {}
 
   fallback() external payable {
-    if (msg.sender == ASSET) {
-      return; // Getting ETH from the WETH contract.
-    }
+    if (msg.sender == ASSET) return; // Getting ETH from the WETH contract.
 
     uint balance = IERC20(ATOKEN).balanceOf(msg.sender);
     uint amt = parseAmount(balance, msg.data);
@@ -203,14 +199,10 @@ contract AaveRouterFactory {
   }
 
   function getRouters(address asset) public view returns (address, address) {
-    if (asset == WETH) {
-      return (SUPPLY_ETH_ROUTER, WITHDRAW_ETH_ROUTER);
-    }
+    if (asset == WETH) return (SUPPLY_ETH_ROUTER, WITHDRAW_ETH_ROUTER);
 
     (address supplyRouter, address withdrawRouter) = computeAddresses(asset);
-    if (supplyRouter.code.length == 0) {
-      return (address(0), address(0));
-    }
+    if (supplyRouter.code.length == 0) return (address(0), address(0));
     return (supplyRouter, withdrawRouter);
   }
 
@@ -224,9 +216,7 @@ contract AaveRouterFactory {
     view
     returns (address, address)
   {
-    if (asset == WETH) {
-      return (SUPPLY_ETH_ROUTER, WITHDRAW_ETH_ROUTER);
-    }
+    if (asset == WETH) return (SUPPLY_ETH_ROUTER, WITHDRAW_ETH_ROUTER);
     address supplyRouter = _computeAddress(asset, true);
     address withdrawRouter = _computeAddress(asset, false);
     return (supplyRouter, withdrawRouter);

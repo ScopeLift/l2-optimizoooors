@@ -44,13 +44,14 @@ line_length = 80
 tab_width = 2
 bracket_spacing = false
 int_types = 'short'
-func_attrs_with_params_multiline = false
+multiline_func_header = 'attributes_first'
 quote_style = 'double'
 number_underscore = 'thousands'
+single_line_statement_blocks = 'single'
 
 # ===============================
 # ======== RPC Endpoints ========
 # ===============================
 [rpc_endpoints]
 optimism = "${OPTIMISM_RPC_URL}"
-arbitrum = "${ARBITRUM_RPC_URL}"
+optimism_goerli = "${OPTIMISM_GOERLI_RPC_URL}"

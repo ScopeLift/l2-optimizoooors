@@ -160,6 +160,7 @@ contract AaveFactoryDeploy is AaveFactoryBaseTest {
   }
 
   function test_RevertsIfAssetAlreadyDeployed(address asset) public {
+    vm.assume(asset != address(vm));
     mockTokenResponses(asset);
 
     factory.deploy(asset);
@@ -170,6 +171,8 @@ contract AaveFactoryDeploy is AaveFactoryBaseTest {
 
 contract AaveFactoryGetRouters is AaveFactoryBaseTest {
   function test_GetRouters(address asset) public {
+    // WETH is excluded since it's already deployed.
+    vm.assume(asset != address(vm) && asset != weth);
     mockTokenResponses(asset);
 
     (address supplyRtr, address withdrawRtr) = factory.getRouters(asset);
@@ -183,6 +186,8 @@ contract AaveFactoryGetRouters is AaveFactoryBaseTest {
   }
 
   function test_IsDeployed(address asset) public {
+    // WETH is excluded since it's already deployed.
+    vm.assume(asset != weth);
     mockTokenResponses(asset);
 
     assertFalse(factory.isDeployed(asset), "deployed1");
