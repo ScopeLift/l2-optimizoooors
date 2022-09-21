@@ -138,18 +138,14 @@ contract ConnextBridgeEth is ConnextBase {
   constructor(IConnext connext, address asset) ConnextBase(connext, asset) {}
 
   fallback() external payable {
-    uint amt =
-      msg.value > 0
+    uint amt = msg.value > 0
       ? msg.value
       : parseAmount(IERC20(ASSET).balanceOf(msg.sender), msg.data);
 
     // Bridging ETH.
-    if (msg.value > 0) {
-      IWETH(ASSET).deposit{value: msg.value}();
-    } else {
-      // Bridging WETH.
-      IERC20(ASSET).safeTransferFrom(msg.sender, address(this), amt);
-    }
+    if (msg.value > 0) IWETH(ASSET).deposit{value: msg.value}();
+    // Bridging WETH.
+    else IERC20(ASSET).safeTransferFrom(msg.sender, address(this), amt);
 
     CONNEXT.xcall(_xcallArgs(amt));
   }
