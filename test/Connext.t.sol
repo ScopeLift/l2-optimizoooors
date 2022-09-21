@@ -67,7 +67,7 @@ contract ConnextFactoryGetRouter is ConnextFactoryBaseTest {
 
   function test_IsDeployed(address asset) public {
     // WETH is excluded since it's already deployed.
-    vm.assume(asset != weth);
+    vm.assume(asset != weth && asset != address(vm));
     mockTokenResponses(asset);
 
     assertFalse(factory.isDeployed(asset), "deployed1");
