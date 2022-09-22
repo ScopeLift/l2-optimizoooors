@@ -164,7 +164,7 @@ contract SuperFlowDelete {
 // ======== Factory ========
 // =========================
 
-contract SuperFlowFactory {
+contract SuperOperatorFactory {
   address public immutable CFA;
 
   event OperatorDeployed(address operator, address indexed asset);
