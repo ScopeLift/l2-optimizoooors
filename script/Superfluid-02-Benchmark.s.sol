@@ -26,8 +26,7 @@ contract BenchmarkSuperfluid is Script {
       "broadcast/Superfluid-01-Deploy.s.sol/10/run-latest.json";
     string memory json = vm.readFile(file);
 
-    address usdcxWrapper =
-      json.readAddress(".transactions[0].additionalContracts[0].address");
+    address usdcxWrapper = json.readAddress(".transactions[0].contractAddress");
 
     address usdcxOperator =
       json.readAddress(".transactions[2].additionalContracts[0].address");
@@ -40,7 +39,7 @@ contract BenchmarkSuperfluid is Script {
     // Wrap USDC.
     usdc.approve(usdcxWrapper, type(uint).max);
     (bool ok,) = usdcxWrapper.call(hex"1c");
-    require(ok, "Optimized token bridge failed");
+    require(ok, "Optimized token wrap failed");
 
     // Approve operator to control usdcx flows.
     host.callAgreement(
@@ -60,6 +59,7 @@ contract BenchmarkSuperfluid is Script {
         bytes20(0x69E271483C38ED4902a55C3Ea8AAb9e7cc8617E5), bytes1(0x80)
       )
     );
+    require(success, "creating token flow failed.");
 
     vm.stopBroadcast();
   }
