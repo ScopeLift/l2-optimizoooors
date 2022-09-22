@@ -22,13 +22,15 @@ contract BenchmarkSuperfluid is Script {
     // =======================
 
     // Read in our operator.
-    string memory file = "broadcast/Superfluid-01-Deploy.s.sol/10/run-latest.json";
+    string memory file =
+      "broadcast/Superfluid-01-Deploy.s.sol/10/run-latest.json";
     string memory json = vm.readFile(file);
 
     address usdcxWrapper =
       json.readAddress(".transactions[0].additionalContracts[0].address");
 
-    address usdcxOperator = json.readAddress(".transactions[2].additionalContracts[0].address");
+    address usdcxOperator =
+      json.readAddress(".transactions[2].additionalContracts[0].address");
 
     // ===========================
     // ======== Execution ========
@@ -51,8 +53,12 @@ contract BenchmarkSuperfluid is Script {
     );
 
     // Create a flow to a known address.
-    (bool success, bytes memory data) = address(SuperFlowOperator(usdcxOperator).CREATE()).call(
-      bytes.concat(bytes20(0x69E271483C38ED4902a55C3Ea8AAb9e7cc8617E5), bytes1(0x80))
+    (bool success, bytes memory data) = address(
+      SuperFlowOperator(usdcxOperator).CREATE()
+    ).call(
+      bytes.concat(
+        bytes20(0x69E271483C38ED4902a55C3Ea8AAb9e7cc8617E5), bytes1(0x80)
+      )
     );
 
     vm.stopBroadcast();

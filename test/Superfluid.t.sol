@@ -34,9 +34,7 @@ contract TokenWrapperFork is SuperfluidForkTestBase {
     deal(address(usdc), user, 100_000e6);
     vm.startPrank(user);
     usdc.approve(address(usdcxWrapper), type(uint).max);
-    (bool success, bytes memory data) = address(usdcxWrapper).call(
-      hex""
-    );
+    (bool success, bytes memory data) = address(usdcxWrapper).call(hex"");
     vm.stopPrank();
     assertTrue(success);
     assertEq(usdcx.balanceOf(user), 100_000e18);

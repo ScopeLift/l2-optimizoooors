@@ -13,7 +13,7 @@ import {SafeTransferLib} from "src/lib/SafeTransferLib.sol";
 interface ISuperfluidToken is IERC20 {
   function getHost() external view returns (address host);
   function getUnderlyingToken() external view returns (address token);
-  function upgradeTo(address to, uint256 amount, bytes calldata data) external;
+  function upgradeTo(address to, uint amount, bytes calldata data) external;
 }
 
 interface ISuperfluid {
@@ -82,22 +82,23 @@ function parseAmount(uint balance, bytes calldata data) pure returns (uint) {
 // =========================
 
 contract SuperTokenWrapper {
-    using SafeTransferLib for IERC20;
-    IERC20 public immutable TOKEN;
-    ISuperfluidToken public immutable ASSET;
+  using SafeTransferLib for IERC20;
 
-    constructor(address asset) {
-      ASSET = ISuperfluidToken(asset);
-      TOKEN = IERC20(ASSET.getUnderlyingToken());
-      TOKEN.safeApprove(address(ASSET), type(uint).max);
-    }
+  IERC20 public immutable TOKEN;
+  ISuperfluidToken public immutable ASSET;
 
-    fallback() external {
-      uint balance = TOKEN.balanceOf(msg.sender);
-      uint amt = parseAmount(balance, msg.data);
-      TOKEN.safeTransferFrom(msg.sender, address(this), amt);
-      ASSET.upgradeTo(msg.sender, amt*1e12, hex"");
-    }
+  constructor(address asset) {
+    ASSET = ISuperfluidToken(asset);
+    TOKEN = IERC20(ASSET.getUnderlyingToken());
+    TOKEN.safeApprove(address(ASSET), type(uint).max);
+  }
+
+  fallback() external {
+    uint balance = TOKEN.balanceOf(msg.sender);
+    uint amt = parseAmount(balance, msg.data);
+    TOKEN.safeTransferFrom(msg.sender, address(this), amt);
+    ASSET.upgradeTo(msg.sender, amt * 1e12, hex"");
+  }
 }
 
 // =========================
