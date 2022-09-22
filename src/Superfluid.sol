@@ -27,7 +27,7 @@ interface ISuperfluidCFA {
     ISuperfluidToken token,
     address flowOperator,
     bytes calldata ctx
-  ) external virtual returns (bytes memory newCtx);
+  ) external returns (bytes memory newCtx);
 
   function createFlowByOperator(
     ISuperfluidToken token,
@@ -35,7 +35,7 @@ interface ISuperfluidCFA {
     address receiver,
     int96 flowRate,
     bytes calldata ctx
-  ) external virtual returns (bytes memory newCtx);
+  ) external returns (bytes memory newCtx);
 
   function updateFlowByOperator(
     ISuperfluidToken token,
@@ -43,14 +43,14 @@ interface ISuperfluidCFA {
     address receiver,
     int96 flowRate,
     bytes calldata ctx
-  ) external virtual returns (bytes memory newCtx);
+  ) external returns (bytes memory newCtx);
 
   function deleteFlowByOperator(
     ISuperfluidToken token,
     address sender,
     address receiver,
     bytes calldata ctx
-  ) external virtual returns (bytes memory newCtx);
+  ) external returns (bytes memory newCtx);
 }
 
 // =========================
@@ -164,4 +164,45 @@ contract SuperFlowDelete {
 // ======== Factory ========
 // =========================
 
-contract SuperFlowFactory {}
+contract SuperFlowFactory {
+  address public immutable CFA;
+
+  event OperatorDeployed(address operator, address indexed asset);
+
+  constructor(address cfa) {
+    CFA = cfa;
+  }
+
+  function deploy(address asset) external returns (address) {
+    address operator = address(
+      new SuperFlowOperator{salt: _salt(asset)}(ISuperfluidCFA(CFA), ISuperfluidToken(asset))
+    );
+
+    emit OperatorDeployed(operator, asset);
+    return operator;
+  }
+
+  function getOperator(address asset) public view returns (address) {
+    address operator = computeAddress(asset);
+    if (operator.code.length == 0) return (address(0));
+    return operator;
+  }
+
+  function isDeployed(address asset) external view returns (bool) {
+    address operator = getOperator(asset);
+    return operator != address(0);
+  }
+
+  function computeAddress(address asset) public view returns (address) {
+    return Create2.computeCreate2Address(
+      _salt(asset),
+      address(this),
+      type(SuperFlowOperator).creationCode,
+      abi.encode(CFA, asset)
+    );
+  }
+
+  function _salt(address asset) internal pure returns (bytes32) {
+    return bytes32(uint(uint160(asset)));
+  }
+}

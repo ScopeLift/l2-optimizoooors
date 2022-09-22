@@ -27,11 +27,10 @@ contract OperatorForkTestBase is Test {
 }
 
 contract OperatorFork is OperatorForkTestBase {
-  function test_Create() public {
-    address testEd = 0x69E271483C38ED4902a55C3Ea8AAb9e7cc8617E5;
+  function test_CreateFlow() public {
     SuperFlowOperator operator = new SuperFlowOperator(cfa, usdcx);
     SuperFlowCreate create = operator.CREATE();
-    vm.startPrank(testEd);
+    deal(address(usdcx), address(this), 100_000e6);
     host.callAgreement(
       address(cfa),
       abi.encodeCall(
@@ -40,9 +39,9 @@ contract OperatorFork is OperatorForkTestBase {
       ),
       new bytes(0)
     );
-    // cfa.authorizeFlowOperatorWithFullControl(usdcx, address(operator), hex"");
-    (bool success, bytes memory data) =
-      address(create).call(bytes.concat(bytes20(makeAddr("hi")), bytes1(0x80)));
+    (bool success, bytes memory data) = address(create).call(
+      bytes.concat(bytes20(makeAddr("receiver")), bytes1(0x80))
+    );
     assertTrue(success);
   }
 }
