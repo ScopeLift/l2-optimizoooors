@@ -10,8 +10,10 @@ import {SafeTransferLib} from "src/lib/SafeTransferLib.sol";
 // ======== Interfaces ========
 // ============================
 
-interface ISuperfluidToken {
+interface ISuperfluidToken is IERC20 {
   function getHost() external view returns (address host);
+  function getUnderlyingToken() external view returns (address token);
+  function upgradeTo(address to, uint256 amount, bytes calldata data) external;
 }
 
 interface ISuperfluid {
@@ -54,10 +56,55 @@ interface ISuperfluidCFA {
 }
 
 // =========================
-// ======== Routers ========
+// ======== Helpers ========
 // =========================
 
-// This contract should be granted permission to manage flows on behalf of a user via `authorizeFlowOperatorWithFullControl`
+// Amounts supplied or withdrawn are specified as a fraction of the user's
+// balance. You can pass up to 31 bytes of data to define this fraction. If zero
+// bytes are provided, the max amount is used. If one byte is provided, that
+// data is considered the numerator, and the denominator becomes 255, which is
+// the max value of a single byte. If two bytes are provided, the data is still
+// considered the numerator, but the denominator becomes 65_535, which is the
+// max value of 2 bytes. This pattern continues through 31 bytes, and this
+// method will revert if you try passing 32 bytes or more of calldata.
+// Realistically you'll never need that much anyway.
+function parseAmount(uint balance, bytes calldata data) pure returns (uint) {
+  if (data.length == 0) return balance;
+
+  uint bits = data.length * 8;
+  uint fraction = uint(bytes32(data) >> (256 - bits));
+  uint maxUintN = (1 << bits) - 1;
+  return balance * fraction / maxUintN;
+}
+
+// =========================
+// ====== SuperToken =======
+// =========================
+
+contract SuperTokenWrapper {
+    using SafeTransferLib for IERC20;
+    IERC20 public immutable TOKEN;
+    ISuperfluidToken public immutable ASSET;
+
+    constructor(address asset) {
+      ASSET = ISuperfluidToken(asset);
+      TOKEN = IERC20(ASSET.getUnderlyingToken());
+      TOKEN.safeApprove(address(ASSET), type(uint).max);
+    }
+
+    fallback() external {
+      uint balance = TOKEN.balanceOf(msg.sender);
+      uint amt = parseAmount(balance, msg.data);
+      TOKEN.safeTransferFrom(msg.sender, address(this), amt);
+      ASSET.upgradeTo(msg.sender, amt*1e12, hex"");
+    }
+}
+
+// =========================
+// ======= Operator ========
+// =========================
+
+/// @notice This contract should be granted permission to manage flows on behalf of a user via `authorizeFlowOperatorWithFullControl`
 contract SuperFlowOperator {
   ISuperfluidCFA public immutable CFA;
   ISuperfluidToken public immutable ASSET;
@@ -161,7 +208,7 @@ contract SuperFlowDelete {
 }
 
 // =========================
-// ======== Factory ========
+// ======= Factories =======
 // =========================
 
 contract SuperOperatorFactory {
