@@ -17,6 +17,9 @@ contract DeploySuperfluidFactory is Script {
     }
 
     vm.broadcast();
+    new SuperTokenWrapper(usdcx);
+
+    vm.broadcast();
     SuperOperatorFactory factory = new SuperOperatorFactory(cfa);
 
     vm.broadcast();

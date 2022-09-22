@@ -22,11 +22,11 @@ contract BenchmarkSuperfluid is Script {
     // =======================
 
     // Read in our operator.
-    string memory file = "broadcast/Connext-01-Deploy.s.sol/10/run-latest.json";
+    string memory file = "broadcast/Superfluid-01-Deploy.s.sol/10/run-latest.json";
     string memory json = vm.readFile(file);
 
     address usdcxWrapper =
-      json.readAddress(".transactions[1].additionalContracts[0].address");
+      json.readAddress(".transactions[0].additionalContracts[0].address");
 
     address usdcxOperator = json.readAddress(".transactions[2].additionalContracts[0].address");
 
