@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import "forge-std/Script.sol";
 import "src/Superfluid.sol";
 
-contract DeploySuperfluidFactory is Script {
+contract DeploySuperfluid is Script {
   address cfa;
   address usdcx;
 
