@@ -105,7 +105,8 @@ contract SuperTokenWrapper {
 // ======= Operator ========
 // =========================
 
-/// @notice This contract should be granted permission to manage flows on behalf of a user via `authorizeFlowOperatorWithFullControl`
+/// @notice This contract should be granted permission to manage flows on behalf
+/// of a user via `authorizeFlowOperatorWithFullControl`
 contract SuperFlowOperator {
   ISuperfluidCFA public immutable CFA;
   ISuperfluidToken public immutable ASSET;
